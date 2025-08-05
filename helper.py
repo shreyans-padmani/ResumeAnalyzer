@@ -1,5 +1,5 @@
-import google.genrativeai as genai
-import Pypdf2 as pdf
+import google.generativeai as genai
+import PyPDF2 as pdf
 import json
 
 def configure_google_api(api_key):
@@ -13,39 +13,42 @@ def configure_google_api(api_key):
         raise Exception("google.genrativeai module is not installed. Please install it using 'pip install google-genrativeai'.")
     
 def get_gemini_response(prompt):
-    """Generate a response using Gemini with enhanced error handling and response validation."""
     try:
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
-        
-        # Ensure response is not empty
+        try:
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            response = model.generate_content(prompt)
+        except Exception as e:
+            if "429" in str(e):
+                print("Pro model quota exceeded — switching to flash...")
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(prompt)
+            else:
+                raise
+
         if not response or not response.text:
             raise Exception("Empty response received from Gemini")
-            
-        # Try to parse the response as JSON
+
         try:
             response_json = json.loads(response.text)
-            
-            # Validate required fields
             required_fields = ["JD Match", "MissingKeywords", "Profile Summary"]
             for field in required_fields:
                 if field not in response_json:
                     raise ValueError(f"Missing required field: {field}")
-                    
             return response.text
-            
+
         except json.JSONDecodeError:
-            # If response is not valid JSON, try to extract JSON-like content
             import re
-            json_pattern = r'\{.*\}'
-            match = re.search(json_pattern, response.text, re.DOTALL)
+            match = re.search(r"\{.*\}", response.text, re.DOTALL)
             if match:
                 return match.group()
             else:
                 raise Exception("Could not extract valid JSON response")
-                
+
     except Exception as e:
         raise Exception(f"Error generating response: {str(e)}")
+    
+def truncate_text(text, max_chars=3000):
+    return text[:max_chars] + ("..." if len(text) > max_chars else "")
 
 
 def extract_text_from_pdf(pdf_path):
