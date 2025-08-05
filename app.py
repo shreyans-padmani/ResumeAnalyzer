@@ -20,7 +20,7 @@ def main():
     init_session_state()
     
     # Configure Generative AI
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = "AIzaSyC0NPV-Iqvhg6pt6rhZnK4Rzg7UDbWZ93s"
     if not api_key:
         st.error("Please set the GOOGLE_API_KEY in your .env file")
         return
