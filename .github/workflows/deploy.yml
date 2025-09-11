@@ -2,7 +2,7 @@ name: Deploy ResumeAnalyzer to VPS
 
 on:
   push:
-    branches: [ "release" ]   # Deploy when pushing to main branch
+    branches: [ "release" ]   # Deploy when pushing to main branch 
 
 jobs:
   build-and-deploy:
