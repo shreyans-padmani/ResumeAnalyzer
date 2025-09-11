@@ -1,0 +1,45 @@
+name: Deploy ResumeAnalyzer to VPS
+
+on:
+  push:
+    branches: [ "release" ]   # Deploy when pushing to main branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish -c Release -o ./publish
+
+      - name: Upload files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ResumeAnalyzer_VPS_HOST }}
+          username: ${{ secrets.ResumeAnalyzer_VPS_USER }}
+          key: ${{ secrets.ResumeAnalyzer_VPS_SSH_KEY }}
+          source: "publish/*"
+          target: "/home/${{ secrets.ResumeAnalyzer_VPS_USER }}/apps/ResumeAnalyzer"
+
+      - name: Restart ResumeAnalyzer service
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            sudo systemctl restart resumeanalyzer
