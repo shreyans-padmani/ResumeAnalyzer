@@ -1,52 +1,57 @@
-name: Deploy ResumeAnalyzer to VPS
+name: Deploy ResumeAnalyzer to Production
 
 on:
   push:
     branches: [ "release" ]   # Deploy when pushing to main branch
 
 jobs:
-  build-and-deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout project code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Setup .NET
-      - name: Setup .NET
+      # 2. Setup .NET SDK
+      - name: Set up .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
 
-      # 3. Restore dependencies
-      - name: Restore dependencies
-        run: dotnet restore ResumeAnalyzer/ResumeAnalyzer.csproj
+      # 3. Cache NuGet packages
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
-      # 4. Build
-      - name: Build project
+      # 4. Build project
+      - name: Build ResumeAnalyzer
         run: dotnet build ResumeAnalyzer/ResumeAnalyzer.csproj --configuration Release --no-restore
 
-      # 5. Publish
-      - name: Publish project
-        run: dotnet publish ResumeAnalyzer/ResumeAnalyzer.csproj -c Release -o ./publish
+      # 5. Publish project
+      - name: Publish ResumeAnalyzer
+        run: dotnet publish ResumeAnalyzer/ResumeAnalyzer.csproj -c Release -o ./publish/
 
-      # 6. Upload files to VPS
-      - name: Upload published files to VPS
+      # 6. Copy files to VPS
+      - name: Upload files to VPS
         uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ResumeAnalyzer_VPS_HOST }}   # Your VPS IP
+          username: ${{ secrets.ResumeAnalyzer_VPS_USER }} # e.g. ubuntu
+          key: ${{ secrets.ResumeAnalyzer_VPS_SSH_KEY }} # Private SSH key
+          source: './publish/*'
+          target: '/home/${{ secrets.ResumeAnalyzer_VPS_USER }}/apps/ResumeAnalyzer/'
+
+      # 7. Restart systemd service
+      - name: Restart ResumeAnalyzer service
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ResumeAnalyzer_VPS_HOST }}
           username: ${{ secrets.ResumeAnalyzer_VPS_USER }}
           key: ${{ secrets.ResumeAnalyzer_VPS_SSH_KEY }}
-          source: "publish/*"
-          target: "/home/${{ secrets.ResumeAnalyzer_VPS_USER }}/apps/ResumeAnalyzer"
-
-      # 7. Restart service on VPS
-      - name: Restart ResumeAnalyzer service
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             sudo systemctl restart resumeanalyzer
